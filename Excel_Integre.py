@@ -25,7 +25,7 @@ KÜrünMaliyetParametre = df.loc["Kazak","Üretim Maliyeti"]
 
 ToplamMaliyetParametre = df.loc["Toplam Maliyet","Maliyet Sınırı"]
 TToplamMaliyetParametre = df.loc["T-shirt","Maliyet Sınırı"]
-SToplaöMaliyetParametre = df.loc["Sort","Maliyet Sınırı"]
+SToplamMaliyetParametre = df.loc["Sort","Maliyet Sınırı"]
 KToplamMaliyetParametre = df.loc["Kazak","Maliyet Sınırı"]
 
 T_shirtKar = df.loc["T-shirt","Kar"] #Objektif Fonksiyon Katsayıları
@@ -51,8 +51,8 @@ KÜretimKısıt = solver.Add(KazakAdet <= KÜretimParametre)
 MaliyetKısıt = solver.Add(TÜrünMaliyetParametre-T_shirtAdet + SÜrünMaliyetParametre*SortAdet + KÜrünMaliyetParametre*KazakAdet <=ToplamMaliyetParametre)
 #Toplam Maliyet
 TMaliyetKısıt = solver.Add(TÜrünMaliyetParametre*T_shirtAdet <=TToplamMaliyetParametre) # Ürün Bazında Maliyet
-SMaliyetKısıt = solver.Add(SÜrünMaliyetParametre*SortAdet <= SToplaöMaliyetParametre)
-KMaliyetKısıt = solver.Add(KÜrünMaliyetParametre*KazakAdet <= SToplaöMaliyetParametre)
+SMaliyetKısıt = solver.Add(SÜrünMaliyetParametre*SortAdet <= SToplamMaliyetParametre)
+KMaliyetKısıt = solver.Add(KÜrünMaliyetParametre*KazakAdet <= SToplamMaliyetParametre)
 
 
 #Objective
