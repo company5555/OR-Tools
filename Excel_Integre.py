@@ -5,6 +5,8 @@ from statsmodels.tsa.holtwinters import SimpleExpSmoothing
 #Ürünlere ait bilgilerin okunması
 df = pd.read_excel("ORTEST.xlsx")
 
+
+
 #Ürünlerin isimlerinin index olarak belirlenmesi
 df.set_index("Ürün", inplace=True)
 
