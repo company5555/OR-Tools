@@ -17,13 +17,17 @@ products = df_sales['Ürün'].unique()
 # Satış fiyatlarını belirleme
 sales_prices = {row['Ürün']: row['Satış Fiyatı'] for _, row in df_sales.iterrows()}
 
-# Satış olasılıklarını belirleme (ortalama alarak)
+# "-" sembollerini NaN olarak değiştirme
+df_sales.replace("-", pd.NA, inplace=True)
+
+# Satış olasılıklarını belirleme (sadece dolu olan yılların ortalamasını alarak)
 sales_probabilities = {}
 for product in products:
     product_data = df_sales[df_sales['Ürün'] == product]
     if not product_data.empty:
-        sales_columns = product_data.iloc[:, 1:product_data.columns.get_loc("Satış Fiyatı")]
-        sales_probabilities[product] = sales_columns.mean(axis=1).values[0]
+        # Sadece sayısal sütunları seçip NaN değerleri dikkate almadan ortalama alıyoruz
+        sales_columns = product_data.iloc[:, 1:product_data.columns.get_loc("Satış Fiyatı")].apply(pd.to_numeric, errors='coerce')
+        sales_probabilities[product] = sales_columns.mean(axis=1, skipna=True).values[0]
     else:
         sales_probabilities[product] = 0
 
@@ -58,9 +62,17 @@ for _, row in df_producers.iterrows():
     constraint = solver.Add(x[producer, product] <= row['Kapasite'])
     capacity_constraints.append((constraint, f"{producer} kapasite kısıtı {product}"))
 
+# Ürün bazlı maksimum üretim kısıtları
+for product in df_urunler['Ürün']:
+    max_production = df_urunler[df_urunler['Ürün'] == product]['Üretim Üst Sınır'].values[0]
+    if max_production > 0:
+        product_constraint = solver.Sum(x[producer, prod] for producer, prod in x if prod == product)
+        solver.Add(product_constraint <= max_production)
+
+
 # Minimum üretim kısıtları
 for product in df_urunler['Ürün']:
-    min_production = df_urunler[df_urunler['Ürün'] == product]['Minimum Üretim'].values[0]
+    min_production = df_urunler[df_urunler['Ürün'] == product]['Üretim Alt Sınır'].values[0]
     if min_production > 0:
         product_constraint = solver.Sum(x[producer, product] for producer, prod in x if prod == product)
         solver.Add(product_constraint >= min_production)
