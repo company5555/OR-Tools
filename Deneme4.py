@@ -1,9 +1,6 @@
 import pandas as pd
 from ortools.linear_solver import pywraplp
 
-# Uyarıları kapatma
-pd.set_option('mode.chained_assignment', None)
-
 # Verileri Excel'den okuma
 file_path = "ORTEST.xlsx"
 df_kisitlar = pd.read_excel(file_path, sheet_name="Ürün - Kısıt")
@@ -24,7 +21,7 @@ maliyet_ust_siniri = df_kisitlar[df_kisitlar['Ürün'] == 'Toplam Maliyet']['Mal
 # "Ürün - Satış" verilerini işleme
 urun_ortalama_satis = {
     row['Ürün']: df_satis.loc[df_satis['Ürün'] == row['Ürün'], ['A', 'B', 'C', 'D', 'E']]
-    .replace('-', pd.NA).astype(float).dropna(axis=1).mean(axis=1).iloc[0]
+    .replace('-', pd.NA).dropna(axis=1).mean(axis=1).iloc[0]
     for _, row in df_satis.iterrows()
 }
 

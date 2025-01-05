@@ -3,185 +3,135 @@ from ortools.linear_solver import pywraplp
 
 # Verileri Excel'den okuma
 file_path = "ORTEST.xlsx"
-df_urunler = pd.read_excel(file_path, sheet_name="Ürün - Kısıt")
-df_sales = pd.read_excel(file_path, sheet_name="Ürün - Satış")
-df_producers = pd.read_excel(file_path, sheet_name="Ürün - Üretici")
+df_kisitlar = pd.read_excel(file_path, sheet_name="Ürün - Kısıt")
+df_satis = pd.read_excel(file_path, sheet_name="Ürün - Satış")
+df_uretici = pd.read_excel(file_path, sheet_name="Ürün - Üretici")
 
-# Debug için verileri yazdırma
-print("\nÜrün üretim sınırları:")
-print(df_urunler[['Ürün', 'Üretim Alt Sınır', 'Üretim Üst Sınır']])
+# "Ürün - Kısıt" verilerini işleme
+urun_kisitlari = {
+    row['Ürün']: {
+        'alt_sinir': row['Üretim Alt Sınır'],
+        'ust_sinir': row['Üretim Üst Sınır']
+    }
+    for _, row in df_kisitlar.iterrows() if row['Ürün'] != 'Toplam Maliyet'
+}
 
-# Satış fiyatlarını belirleme
-sales_prices = {row['Ürün']: row['Satış Fiyatı'] for _, row in df_sales.iterrows()}
+
+
+# Excel dosyasını yükleme (örneğin, 'satislar.xlsx')
+
+
+# Sütun adlarını düzenleme
+df_satis.columns = df_satis.columns.astype(str).str.replace(',', '').str.strip()
+
+# Düzenlenmiş sütun adlarını kontrol etme
+print("Düzenlenmiş sütun adları:", df_satis.columns)
+
+# Yıl sütunlarını otomatik algılama
+yillar = [col for col in df_satis.columns if col.isdigit()]
+print("Yıl sütunları:", yillar)
+
+# Ürün ortalama satış oranlarını hesaplama
+urun_ortalama_satis = {}
+for index, row in df_satis.iterrows():
+    urun = row['Ürün']
+    satis_oranlari = row[yillar]
+    urun_ortalama_satis[urun] = satis_oranlari.mean()
+
+# Ortalama satış oranlarını yazdırma
+print("Ürün ortalama satış oranları:", urun_ortalama_satis)
+
+
+maliyet_ust_siniri = df_kisitlar[df_kisitlar['Ürün'] == 'Toplam Maliyet']['Maliyet'].values[0]
+
+# "Ürün - Satış" verilerini işleme
+urun_ortalama_satis = {
+    row['Ürün']: df_satis.loc[df_satis['Ürün'] == row['Ürün'], ['2020', '2021', '2022', '2023', '2024']]
+    .replace('-', pd.NA).dropna(axis=1).mean(axis=1).iloc[0]
+    for _, row in df_satis.iterrows()
+}
+
+urun_satis_fiyatlari = {
+    row['Ürün']: row['Satış Fiyatı'] for _, row in df_satis.iterrows()
+}
+
+# "Ürün - Üretici" verilerini işleme
+ureticiler = {}
+for _, row in df_uretici.iterrows():
+    uretici = row['Üretici']
+    kapasite = row['Kapasite']
+    ureticiler[uretici] = {
+        'kapasite': kapasite,
+        'urunler': {
+            row[f'Ürün {i}']: row[f'Birim Maliyet {i}']
+            for i in range(1, len(row)//2) if pd.notna(row[f'Ürün {i}'])
+        }
+    }
 
 # OR-Tools çözümleyicisini oluşturma
-solver = pywraplp.Solver.CreateSolver("SCIP")
+solver = pywraplp.Solver.CreateSolver('SCIP')
 if not solver:
-    print("Solver oluşturulamadı!")
-    exit(1)
-
-# Ürünler
-products = df_sales['Ürün'].unique()
-
-# Satış olasılıklarını belirleme
-df_sales.replace("-", pd.NA, inplace=True)
-sales_probabilities = {}
-for product in products:
-    product_data = df_sales[df_sales['Ürün'] == product]
-    if not product_data.empty:
-        sales_columns = product_data.select_dtypes(include=['float64', 'int64']).iloc[:, :-1]
-        non_zero_mean = sales_columns.replace(0, pd.NA).mean(axis=1, skipna=True)
-        sales_probabilities[product] = non_zero_mean.iloc[0] if not non_zero_mean.empty else 0
-    else:
-        sales_probabilities[product] = 0
+    raise Exception("Solver oluşturulamadı!")
 
 # Karar değişkenleri
 x = {}
-for _, row in df_producers.iterrows():
-    producer = row['Üretici']
-    product = row['Ürün']
-    if pd.notna(row['Kapasite']):
-        x[producer, product] = solver.IntVar(0, int(row['Kapasite']), f'x_{producer}_{product}')
+for uretici, data in ureticiler.items():
+    for urun, maliyet in data['urunler'].items():
+        x[uretici, urun] = solver.IntVar(0, data['kapasite'], f'x_{uretici}_{urun}')
 
 # Amaç fonksiyonu
 objective = solver.Objective()
-for _, row in df_producers.iterrows():
-    producer = row['Üretici']
-    product = row['Ürün']
-    if (producer, product) in x:
-        unit_cost = float(row['Birim Maliyet'])
-        unit_price = float(sales_prices.get(product, 0))
-        sales_probability = float(sales_probabilities.get(product, 0))
-        profit_per_unit = (unit_price * sales_probability) - unit_cost
-        objective.SetCoefficient(x[producer, product], profit_per_unit)
+for (uretici, urun), var in x.items():
+    if urun in urun_ortalama_satis:
+        satis_ortalamasi = urun_ortalama_satis[urun]
+        satis_fiyati = urun_satis_fiyatlari[urun]
+        birim_maliyet = ureticiler[uretici]['urunler'][urun]
+        objective.SetCoefficient(var, (satis_ortalamasi * satis_fiyati) - birim_maliyet)
 objective.SetMaximization()
 
-# Üretici kapasite kısıtları
-for _, row in df_producers.iterrows():
-    producer = row['Üretici']
-    product = row['Ürün']
-    if (producer, product) in x:
-        solver.Add(x[producer, product] <= row['Kapasite'])
+# Kısıtlar
+# Ürün üretim sınırları
+for urun, kisit in urun_kisitlari.items():
+    urun_vars = [x[uretici, urun] for uretici in ureticiler if (uretici, urun) in x]
+    if urun_vars:
+        toplam_uretim = solver.Sum(urun_vars)
+        if not pd.isna(kisit['alt_sinir']):
+            solver.Add(toplam_uretim >= kisit['alt_sinir'])
+        if not pd.isna(kisit['ust_sinir']):
+            solver.Add(toplam_uretim <= kisit['ust_sinir'])
 
-# Ürün bazlı kısıtlar - ÜST SINIR DÜZELTMESİ
-print("\nUygulanan ürün kısıtları:")
-for _, row in df_urunler.iterrows():
-    product = row['Ürün']
-    if product != 'Toplam Maliyet':
-        product_vars = [x[producer, prod] for (producer, prod) in x.keys() if prod == product]
-        
-        if product_vars:
-            total_production = solver.Sum(product_vars)
-            
-            # Üst sınır kontrolü ve kısıtı
-            if pd.notna(row['Üretim Üst Sınır']):
-                upper_bound = float(row['Üretim Üst Sınır'])
-                if upper_bound > 0:
-                    constraint = solver.Add(total_production <= upper_bound)
-                    print(f"{product} için üst sınır kısıtı: <= {upper_bound}")
-            
-            # Alt sınır kontrolü ve kısıtı
-            if pd.notna(row['Üretim Alt Sınır']):
-                lower_bound = float(row['Üretim Alt Sınır'])
-                if lower_bound > 0:
-                    constraint = solver.Add(total_production >= lower_bound)
-                    print(f"{product} için alt sınır kısıtı: >= {lower_bound}")
+# Üretici kapasite sınırları
+for uretici, data in ureticiler.items():
+    toplam_kullanim = solver.Sum(x[uretici, urun] for urun in data['urunler'] if (uretici, urun) in x)
+    solver.Add(toplam_kullanim <= data['kapasite'])
 
-# Toplam maliyet kısıtı
-total_cost = solver.Sum(x[producer, product] * row['Birim Maliyet'] 
-                       for _, row in df_producers.iterrows() 
-                       for producer, product in [(row['Üretici'], row['Ürün'])] 
-                       if (producer, product) in x)
-
-maliyet_siniri = float(df_urunler[df_urunler['Ürün'] == 'Toplam Maliyet']['Maliyet'].values[0])
-solver.Add(total_cost <= maliyet_siniri)
+# Toplam maliyet sınırı
+toplam_maliyet = solver.Sum(
+    x[uretici, urun] * ureticiler[uretici]['urunler'][urun]
+    for (uretici, urun) in x
+)
+solver.Add(toplam_maliyet <= maliyet_ust_siniri)
 
 # Çözümü bulma
 status = solver.Solve()
 
-# Sonuçları yazdırma
+# Çıktılar
 if status == pywraplp.Solver.OPTIMAL:
-    print('\nOPTİMAL ÇÖZÜM DETAYLARI:')
-    print('=' * 80)
-    
-    # Ürün bazlı sonuçlar için sözlükler
-    urun_toplam_uretim = {}
-    urun_toplam_maliyet = {}
-    urun_toplam_gelir = {}
-    
-    # Her üretici ve ürün için sonuçları hesapla
-    for (producer, product), var in x.items():
-        production = var.solution_value()
-        if production > 0:
-            producer_row = df_producers[
-                (df_producers['Üretici'] == producer) & 
-                (df_producers['Ürün'] == product)
-            ].iloc[0]
-            
-            if product not in urun_toplam_uretim:
-                urun_toplam_uretim[product] = 0
-                urun_toplam_maliyet[product] = 0
-                urun_toplam_gelir[product] = 0
-            
-            uretim = production
-            birim_maliyet = producer_row['Birim Maliyet']
-            maliyet = uretim * birim_maliyet
-            if product in sales_prices:
-                satis_fiyati = sales_prices[product]
-                satis_olasiligi = sales_probabilities[product]
-                beklenen_gelir = uretim * satis_fiyati * satis_olasiligi
-            else:
-                print(f"UYARI: {product} için satış fiyatı bulunamadı!")
-                continue
-            
-            urun_toplam_uretim[product] += uretim
-            urun_toplam_maliyet[product] += maliyet
-            urun_toplam_gelir[product] += beklenen_gelir
-            
-            print(f"\nÜretici: {producer} - Ürün: {product}")
-            print(f"  Üretim Miktarı: {uretim:,.0f}")
-            print(f"  Birim Maliyet: {birim_maliyet:,.2f}")
-            print(f"  Toplam Maliyet: {maliyet:,.2f}")
-            print(f"  Satış Fiyatı: {satis_fiyati:,.2f}")
-            print(f"  Satış Olasılığı: {satis_olasiligi:,.2%}")
-            print(f"  Beklenen Gelir: {beklenen_gelir:,.2f}")
-    
-    # Ürün bazlı özet
-    print('\nÜRÜN BAZLI ÖZET:')
-    print('=' * 80)
-    genel_toplam_uretim = 0
-    genel_toplam_maliyet = 0
-    genel_toplam_gelir = 0
-    
-    for product in urun_toplam_uretim.keys():
-        uretim = urun_toplam_uretim[product]
-        maliyet = urun_toplam_maliyet[product]
-        gelir = urun_toplam_gelir[product]
-        kar = gelir - maliyet
-        
-        # Üst sınır kontrolü
-        urun_ust_sinir = df_urunler[df_urunler['Ürün'] == product]['Üretim Üst Sınır'].values[0]
-        
-        print(f"\nÜrün: {product}")
-        print(f"  Toplam Üretim: {uretim:,.0f} (Üst Sınır: {urun_ust_sinir:,.0f})")
-        print(f"  Toplam Maliyet: {maliyet:,.2f}")
-        print(f"  Beklenen Toplam Gelir: {gelir:,.2f}")
-        print(f"  Beklenen Kar: {kar:,.2f}")
-        
-        genel_toplam_uretim += uretim
-        genel_toplam_maliyet += maliyet
-        genel_toplam_gelir += gelir
-    
-    print('\nGENEL ÖZET:')
-    print('=' * 80)
-    print(f"Toplam Üretim: {genel_toplam_uretim:,.0f}")
-    print(f"Toplam Maliyet: {genel_toplam_maliyet:,.2f}")
-    print(f"Beklenen Toplam Gelir: {genel_toplam_gelir:,.2f}")
-    print(f"Beklenen Toplam Kar: {genel_toplam_gelir - genel_toplam_maliyet:,.2f}")
-    
-elif status == pywraplp.Solver.FEASIBLE:
-    print('Uygun bir çözüm bulundu, ancak optimal olmayabilir.')
-elif status == pywraplp.Solver.INFEASIBLE:
-    print('Problem çözülemez (kısıtlar çelişiyor olabilir).')
+    print("SATIŞ OLASILIKLARI:")
+    for urun, satis_ortalamasi in urun_ortalama_satis.items():
+        print(f"  {urun}: {satis_ortalamasi:.2f}")
+
+    print("\nÜRETİM SONUÇLARI:")
+    z_degeri = 0
+    for (uretici, urun), var in x.items():
+        if var.solution_value() > 0:
+            satis_ortalamasi = urun_ortalama_satis[urun]
+            satis_fiyati = urun_satis_fiyatlari[urun]
+            birim_maliyet = ureticiler[uretici]['urunler'][urun]
+            kar = (satis_ortalamasi * satis_fiyati - birim_maliyet) * var.solution_value()
+            z_degeri += kar
+            print(f"  Üretici: {uretici}, Ürün: {urun}, Üretim: {var.solution_value()}, Kar: {kar:.2f}")
+
+    print(f"\nZ Değeri (Amaç Fonksiyonu): {z_degeri:.2f}")
 else:
-    print(f'Optimal çözüm bulunamadı. Solver durumu: {status}')
+    print("Çözüm bulunamadı.")
