@@ -1,6 +1,7 @@
 import pandas as pd
 from ortools.linear_solver import pywraplp
 pd.set_option('future.no_silent_downcasting', True)
+import xlsxwriter
 
 #Verileri Yükleme
 file_path = "ORTEST.xlsx"
@@ -104,8 +105,6 @@ objective.SetMaximization()
     
 
 
-status = solver.Solve()
-
 # Modelin Çözülmesi ve Sonuçların Çıktısı
 status = solver.Solve()
 
@@ -117,73 +116,82 @@ def format_number(number):
     else:
         # Tam sayılar için ondalık gösterme
         return f"{number:,}".replace(",", ".")
-
-if status == pywraplp.Solver.OPTIMAL:
-    print("Optimal çözüm bulundu!\n")
     
-    toplam_uretim = 0
-    toplam_maliyet = 0
-    toplam_beklenen_gelir = 0
-    
-    # Ürünlerin detaylarını yazdırmak için
-    for urun in urunler:
-        urun_toplam_adet = 0
-        urun_toplam_maliyet = 0
-        urun_beklenen_gelir = 0
-        
-        satis_olasiligi = sales_probability.get(urun, 0)
-        satis_fiyati = satis_fiyat.get(urun, 0)
 
-        print(f"\nÜrün: {urun}")
-        print(f"Satış Olasılığı: {format_number(satis_olasiligi)}")
-        print(f"Satış Fiyatı: {format_number(satis_fiyati)}")
-        
-        # Ürün için tüm üreticilerdeki detayları hesapla
-        for uretici in ureticiler:
-            if (urun, uretici) in x:
-                uretim_adedi = x[(urun, uretici)].solution_value()
-                if uretim_adedi > 0:
-                    birim_maliyet = urun_uretici_dict[(urun, uretici)]
-                    maliyet = uretim_adedi * birim_maliyet
-                    beklenen_gelir = uretim_adedi * satis_fiyati * satis_olasiligi
-                    
-                    urun_toplam_adet += uretim_adedi
-                    urun_toplam_maliyet += maliyet
-                    urun_beklenen_gelir += beklenen_gelir
-                    
-                    print(f"  Üretici: {uretici}")
-                    print(f"    Üretim Adedi: {format_number(int(uretim_adedi))}")
-                    print(f"    Birim Maliyet: {format_number(birim_maliyet)}")
-                    print(f"    Toplam Maliyet: {format_number(maliyet)}")
-                    print(f"    Beklenen Gelir: {format_number(beklenen_gelir)}")
-        
-        if urun_toplam_adet > 0:
-            urun_kar = urun_beklenen_gelir - urun_toplam_maliyet
-            print(f"  Ürün Toplam Üretim: {format_number(int(urun_toplam_adet))}")
-            print(f"  Ürün Toplam Maliyet: {format_number(urun_toplam_maliyet)}")
-            print(f"  Ürün Beklenen Gelir: {format_number(urun_beklenen_gelir)}")
-            print(f"  Ürün Beklenen Kâr: {format_number(urun_kar)}")
+
+# Katsayıları depolamak için boş listeler oluştur
+data_rows = []
+
+# Her ürün ve üretici kombinasyonu için katsayıları hesapla
+for urun in urunler:
+    fiyat = satis_fiyat[urun]
+    olasilik = sales_probability[urun]
+    
+    for uretici in ureticiler:
+        if (urun, uretici) in urun_uretici_dict:
+            maliyet = urun_uretici_dict[(urun, uretici)]
+            net_kar = (fiyat * olasilik) - maliyet + 0.0001
             
-            toplam_uretim += urun_toplam_adet
-            toplam_maliyet += urun_toplam_maliyet
-            toplam_beklenen_gelir += urun_beklenen_gelir
-    
-    toplam_kar = toplam_beklenen_gelir - toplam_maliyet
-    
-    print("\n=== GENEL ÖZET ===")
-    print(f"Toplam Üretim Adedi: {format_number(int(toplam_uretim))}")
-    print(f"Toplam Maliyet: {format_number(toplam_maliyet)}")
-    print(f"Toplam Beklenen Gelir: {format_number(toplam_beklenen_gelir)}")
-    print(f"Toplam Beklenen Kâr: {format_number(toplam_kar)}")
+            # Her satır için veri sözlüğü oluştur
+            row_data = {
+                'Ürün': urun,
+                'Üretici': uretici,
+                'Satış Fiyatı': fiyat,
+                'Satış Olasılığı': olasilik,
+                'Birim Maliyet': maliyet,
+                'Net Katsayı': net_kar,
+                'Beklenen Gelir': fiyat * olasilik
+            }
+            data_rows.append(row_data)
 
-elif status == pywraplp.Solver.INFEASIBLE:
-    print("Çözüm bulunamadı! Modelin kısıtları çelişkili olabilir.")
-elif status == pywraplp.Solver.UNBOUNDED:
-    print("Çözüm sınırsız! Modelde bir hata olabilir, kısıtlar yeterince sınırlayıcı değil.")
-elif status == pywraplp.Solver.FEASIBLE:
-    print("Feasable çözüm bulundu, ancak optimal çözüm değil.")
-elif status == pywraplp.Solver.ABNORMAL:
-    print("Çözümde anormal bir durum oluştu, çözüm algoritması hatalı olabilir.")
-else:
-    print("Çözüm bulunmadı! Çözüm algoritması çalıştırılmadı.")
+# DataFrame oluştur
+df_coefficients = pd.DataFrame(data_rows)
+
+# Sütunları düzenle
+df_coefficients = df_coefficients[[
+    'Ürün', 
+    'Üretici', 
+    'Satış Fiyatı', 
+    'Satış Olasılığı', 
+    'Birim Maliyet', 
+    'Beklenen Gelir',
+    'Net Katsayı'
+]]
+
+# Sayısal değerleri formatla
+format_dict = {
+    'Satış Fiyatı': '{:.2f}',
+    'Satış Olasılığı': '{:.2%}',
+    'Birim Maliyet': '{:.2f}',
+    'Beklenen Gelir': '{:.2f}',
+    'Net Katsayı': '{:.2f}'
+}
+
+# DataFrame'i formatlı şekilde Excel'e kaydet
+excel_file = 'urun_katsayilari.xlsx'
+with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
+    df_coefficients.to_excel(writer, sheet_name='Katsayılar', index=False)
+    
+    # Excel çalışma kitabı ve sayfasını al
+    workbook = writer.book
+    worksheet = writer.sheets['Katsayılar']
+    
+    # Formatlama için stil oluştur
+    number_format = workbook.add_format({'num_format': '#,##0.00'})
+    percent_format = workbook.add_format({'num_format': '0.00%'})
+    
+    # Sütunlara format uygula
+    worksheet.set_column('C:C', 12, number_format)  # Satış Fiyatı
+    worksheet.set_column('D:D', 12, percent_format) # Satış Olasılığı
+    worksheet.set_column('E:E', 12, number_format)  # Birim Maliyet
+    worksheet.set_column('F:F', 12, number_format)  # Beklenen Gelir
+    worksheet.set_column('G:G', 12, number_format)  # Net Katsayı
+    
+    # Sütun genişliklerini ayarla
+    worksheet.set_column('A:A', 15)  # Ürün
+    worksheet.set_column('B:B', 15)  # Üretici
+
+print(f"Katsayılar '{excel_file}' dosyasına kaydedildi.")
+
+
 

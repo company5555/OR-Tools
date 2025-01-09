@@ -10,11 +10,9 @@ urun_satis_data = pd.read_excel(file_path, sheet_name="Ürün - Satış")
 urun_uretici_data = pd.read_excel(file_path, sheet_name="Ürün - Üretici")
 uretici_kapasite_data = pd.read_excel(file_path, sheet_name="Üretici - Kapasite")
 toplam_maliyet_data = pd.read_excel(file_path, sheet_name="Ürün - Kısıt")
+
 #"Toplam Maliyet" Satırını Hariç Tutma ve Ürün İsimlerini Normalize Etme
-
 urun_kisit_data = urun_kisit_data[urun_kisit_data['Ürün'] != "Toplam Maliyet"]
-
-
 
 #Ürünlerin tanımı
 urunler = [urun for urun in urun_kisit_data['Ürün']]
@@ -47,11 +45,8 @@ urun_uretici_dict = {
 solver = pywraplp.Solver.CreateSolver('SCIP')
 
 x = {}
-for (urun, uretici) in urun_uretici_dict.keys():  # Sadece geçerli (Ürün, Üretici) çiftleri için değişken oluştur
+for (urun, uretici) in urun_uretici_dict.keys():  
     x[(urun, uretici)] = solver.IntVar(0, solver.infinity(), f'x_{urun}_{uretici}')
-
-
-
 
 #Kısıtlar
 #Ürün Alt ve Üst Üretim Sınırı
@@ -62,13 +57,11 @@ for urun in urunler:
     gecerli_uretici_ciftleri = [uretici for uretici in ureticiler if (urun, uretici) in x]
     
     solver.Add(
+        solver.Sum(x[(urun, uretici)] for uretici in gecerli_uretici_ciftleri) >= urun_alt
+    )
+    solver.Add(
         solver.Sum(x[(urun, uretici)] for uretici in gecerli_uretici_ciftleri) <= urun_ust
     )
-# Önce alt sınırları düşük tutarak çözün
-for urun in urunler:
-    original_alt_sinir = urun_kisit_data.loc[urun_kisit_data['Ürün'] == urun, 'Üretim Alt Sınır'].values[0]
-    urun_kisit_data.loc[urun_kisit_data['Ürün'] == urun, 'Üretim Alt Sınır'] = original_alt_sinir * 0.5  # %50 azalt
-
 
 # Toplam Maliyet Kısıtı
 toplam_maliyet_ust_sinir = float(toplam_maliyet_data[toplam_maliyet_data['Ürün'] == 'Toplam Maliyet']['Maliyet'].values[0])
@@ -96,17 +89,10 @@ for (urun, uretici), var in x.items():
     olasilik = sales_probability[urun]
     maliyet = urun_uretici_dict.get((urun, uretici), 0)
     net_kar = (fiyat * olasilik) - maliyet
-    
-    # Çok küçük bir pozitif sayı ekleyerek sıfır üretimden kaçınmayı teşvik et
-    objective.SetCoefficient(var, net_kar + 0.0001)
+    objective.SetCoefficient(var, net_kar)
 
 objective.SetMaximization()
-    
 
-
-status = solver.Solve()
-
-# Modelin Çözülmesi ve Sonuçların Çıktısı
 status = solver.Solve()
 
 def format_number(number):
@@ -186,4 +172,3 @@ elif status == pywraplp.Solver.ABNORMAL:
     print("Çözümde anormal bir durum oluştu, çözüm algoritması hatalı olabilir.")
 else:
     print("Çözüm bulunmadı! Çözüm algoritması çalıştırılmadı.")
-
