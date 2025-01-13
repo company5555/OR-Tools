@@ -1,7 +1,6 @@
 import pandas as pd
 pd.set_option('future.no_silent_downcasting', True)
 
-# Verileri Yükleme
 def load_data(file_path):
     urun_kisit_data = pd.read_excel(file_path, sheet_name="Ürün - Kısıt")
     urun_satis_data = pd.read_excel(file_path, sheet_name="Ürün - Satış")
@@ -45,13 +44,7 @@ def calculate_coefficients(urun_satis_data, urun_uretici_data):
     
     return coefficients, sales_probability, satis_fiyat
 
-def greedy_optimization(file_path):
-    # Verileri yükle
-    urun_kisit_data, urun_satis_data, urun_uretici_data, uretici_kapasite_data, toplam_maliyet = load_data(file_path)
-    
-    # Katsayıları hesapla
-    coefficients, sales_probability, satis_fiyat = calculate_coefficients(urun_satis_data, urun_uretici_data)
-    
+def calculate_production_plan(urun_kisit_data, uretici_kapasite_data, coefficients, toplam_maliyet):
     # Üretici kapasitelerini dictionary'e al
     uretici_kapasiteleri = {}
     for _, row in uretici_kapasite_data.iterrows():
@@ -100,10 +93,7 @@ def greedy_optimization(file_path):
             uretici_kapasiteleri[uretici]['kalan_kapasite'] -= max_uretim
             kalan_toplam_maliyet -= max_uretim * coefficient['birim_maliyet']
     
-
-
-# [Previous functions remain the same: load_data, calculate_coefficients]
-# Adding new function to create Excel output
+    return uretim_plani
 
 def create_excel_report(uretim_plani, coefficients, sales_probability, satis_fiyat):
     # Dictionary to store results for each product
@@ -164,21 +154,22 @@ def create_excel_report(uretim_plani, coefficients, sales_probability, satis_fiy
     df.to_excel('production_results.xlsx', index=False, float_format='%.2f')
     return df
 
-def greedy_optimization(file_path):
+def main(file_path):
     # Load data
     urun_kisit_data, urun_satis_data, urun_uretici_data, uretici_kapasite_data, toplam_maliyet = load_data(file_path)
     
     # Calculate coefficients
     coefficients, sales_probability, satis_fiyat = calculate_coefficients(urun_satis_data, urun_uretici_data)
     
-    # [Rest of the greedy_optimization function remains the same until the end]
+    # Calculate production plan
+    uretim_plani = calculate_production_plan(urun_kisit_data, uretici_kapasite_data, coefficients, toplam_maliyet)
     
-    # Replace print_results with Excel export
+    # Create and export Excel report
     df = create_excel_report(uretim_plani, coefficients, sales_probability, satis_fiyat)
     print("Results have been exported to 'production_results.xlsx'")
     print("\nSummary of results:")
     print(df.to_string(index=False))
 
-# Run the optimization
-file_path = "ORTEST.xlsx"
-greedy_optimization(file_path)
+if __name__ == "__main__":
+    file_path = "ORTEST.xlsx"
+    main(file_path)
