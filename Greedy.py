@@ -100,85 +100,94 @@ def greedy_optimization(file_path):
             uretici_kapasiteleri[uretici]['kalan_kapasite'] -= max_uretim
             kalan_toplam_maliyet -= max_uretim * coefficient['birim_maliyet']
     
+    # Sonuçları yazdır
+    print_results(uretim_plani, coefficients, sales_probability, satis_fiyat)
 
+def format_number(number):
+    """Sayıları binlik ayracı olarak nokta kullanarak formatlar"""
+    if isinstance(number, float):
+        return f"{number:,.2f}".replace(",", ".")
+    else:
+        return f"{number:,}".replace(",", ".")
 
-# [Previous functions remain the same: load_data, calculate_coefficients]
-# Adding new function to create Excel output
-
-def create_excel_report(uretim_plani, coefficients, sales_probability, satis_fiyat):
-    # Dictionary to store results for each product
-    results = {
-        'Product': [],
-        'Total Production Amount': [],
-        'Total Income': [],
-        'Total Cost': [],
-        'Profit': []
-    }
+def print_results(uretim_plani, coefficients, sales_probability, satis_fiyat):
+    toplam_uretim = 0
+    toplam_maliyet = 0
+    toplam_beklenen_gelir = 0
     
-    # Group by product
+    print("=== DETAYLI ÜRETİM PLANI ===")
+    
+    # Ürünlere göre grupla
     urun_bazli_plan = {}
     for (urun, uretici), miktar in uretim_plani.items():
         if urun not in urun_bazli_plan:
             urun_bazli_plan[urun] = []
         urun_bazli_plan[urun].append((uretici, miktar))
     
-    # Calculate totals for each product
+    # Her ürün için detayları yazdır
     for urun, uretimler in urun_bazli_plan.items():
         urun_toplam_adet = 0
         urun_toplam_maliyet = 0
         urun_beklenen_gelir = 0
+        
+        print(f"\nÜrün: {urun}")
+        print(f"Satış Olasılığı: {format_number(sales_probability[urun])}")
+        print(f"Satış Fiyatı: {format_number(satis_fiyat[urun])}")
         
         for uretici, miktar in uretimler:
             birim_maliyet = coefficients[(urun, uretici)]['birim_maliyet']
             maliyet = miktar * birim_maliyet
             beklenen_gelir = miktar * satis_fiyat[urun] * sales_probability[urun]
             
+            print(f"  Üretici: {uretici}")
+            print(f"    Üretim Adedi: {format_number(int(miktar))}")
+            print(f"    Birim Maliyet: {format_number(birim_maliyet)}")
+            print(f"    Toplam Maliyet: {format_number(maliyet)}")
+            print(f"    Beklenen Gelir: {format_number(beklenen_gelir)}")
+            
             urun_toplam_adet += miktar
             urun_toplam_maliyet += maliyet
             urun_beklenen_gelir += beklenen_gelir
         
         urun_kar = urun_beklenen_gelir - urun_toplam_maliyet
+        print(f"  Ürün Toplam Üretim: {format_number(int(urun_toplam_adet))}")
+        print(f"  Ürün Toplam Maliyet: {format_number(urun_toplam_maliyet)}")
+        print(f"  Ürün Beklenen Gelir: {format_number(urun_beklenen_gelir)}")
+        print(f"  Ürün Beklenen Kâr: {format_number(urun_kar)}")
         
-        # Add to results dictionary
-        results['Product'].append(urun)
-        results['Total Production Amount'].append(int(urun_toplam_adet))
-        results['Total Income'].append(urun_beklenen_gelir)
-        results['Total Cost'].append(urun_toplam_maliyet)
-        results['Profit'].append(urun_kar)
+        toplam_uretim += urun_toplam_adet
+        toplam_maliyet += urun_toplam_maliyet
+        toplam_beklenen_gelir += urun_beklenen_gelir
     
-    # Create DataFrame
-    df = pd.DataFrame(results)
+    toplam_kar = toplam_beklenen_gelir - toplam_maliyet
     
-    # Add total row
-    totals = pd.Series({
-        'Product': 'TOTAL',
-        'Total Production Amount': df['Total Production Amount'].sum(),
-        'Total Income': df['Total Income'].sum(),
-        'Total Cost': df['Total Cost'].sum(),
-        'Profit': df['Profit'].sum()
-    })
-    
-    df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)
-    
-    # Export to Excel
-    df.to_excel('production_results.xlsx', index=False, float_format='%.2f')
-    return df
+    print("\n=== GENEL ÖZET ===")
+    print(f"Toplam Üretim Adedi: {format_number(int(toplam_uretim))}")
+    print(f"Toplam Maliyet: {format_number(toplam_maliyet)}")
+    print(f"Toplam Beklenen Gelir: {format_number(toplam_beklenen_gelir)}")
+    print(f"Toplam Beklenen Kâr: {format_number(toplam_kar)}")
 
-def greedy_optimization(file_path):
-    # Load data
-    urun_kisit_data, urun_satis_data, urun_uretici_data, uretici_kapasite_data, toplam_maliyet = load_data(file_path)
-    
-    # Calculate coefficients
-    coefficients, sales_probability, satis_fiyat = calculate_coefficients(urun_satis_data, urun_uretici_data)
-    
-    # [Rest of the greedy_optimization function remains the same until the end]
-    
-    # Replace print_results with Excel export
-    df = create_excel_report(uretim_plani, coefficients, sales_probability, satis_fiyat)
-    print("Results have been exported to 'production_results.xlsx'")
-    print("\nSummary of results:")
-    print(df.to_string(index=False))
-
-# Run the optimization
+# Çalıştırma
 file_path = "ORTEST.xlsx"
 greedy_optimization(file_path)
+
+
+
+def uretici_ozet_rapor(uretim_plani):
+    # Üreticilere göre grupla
+    uretici_bazli = {}
+    for (urun, uretici), miktar in uretim_plani.items():
+        if uretici not in uretici_bazli:
+            uretici_bazli[uretici] = []
+        uretici_bazli[uretici].append((urun, miktar))
+    
+    print("\n=== ÜRETİCİ BAZLI ÜRETİM ÖZETİ ===")
+    for uretici, uretimler in uretici_bazli.items():
+        print(f"\nÜretici: {uretici}")
+        for urun, miktar in uretimler:
+            print(f"  {urun}: {int(miktar):,} adet".replace(",", "."))
+
+# Kullanımı:
+file_path = "ORTEST.xlsx"
+uretim_plani, _, _, _ = greedy_optimization(file_path)
+uretici_ozet_rapor(uretim_plani)
