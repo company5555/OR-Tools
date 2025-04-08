@@ -3,7 +3,7 @@ import numpy as np
 from ortools.linear_solver import pywraplp
 
 # Monte Carlo Simülasyonu Parametreleri
-SIMULASYON_SAYISI = 4  # Simülasyon sayısını buradan değiştirebilirsiniz.
+SIMULASYON_SAYISI = 90  # Simülasyon sayısını buradan değiştirebilirsiniz.
 SIMULASYON_SONUCLARI = []
 
 np.random.seed(12)  # Sabit bir başlangıç değeri kullanarak simülasyonu yeniden üretilebilir yapıyoruz.
@@ -32,25 +32,28 @@ uretici_alt_kapasite_dict = dict(zip(uretici_kapasite_data['Üretici'], uretici_
 def iterasyon_sonuclarini_yazdir(iterasyon, sales_stochastic, x_values, toplam_kar, toplam_maliyet, uretici_toplam_uretim):
     print(f"\n=== {iterasyon + 1}. İTERASYON SONUÇLARI ===")
     
-    print("Stokastik Satış Miktarları:")
+    # Stokastik Taleplerin Yazdırılması
+    print("Stokastik Talepler (Satış Miktarları):")
     for urun, miktar in sales_stochastic.items():
         print(f"{urun}: {miktar:.2f}")
     
+    # Üretim Miktarlarının Yazdırılması
     print("\nÜretim Miktarları:")
     for (urun, uretici), uretim_miktari in x_values.items():
         if uretim_miktari > 0:
             print(f"{urun} - {uretici}: {uretim_miktari:.2f}")
 
+    # Toplam Üretim Maliyeti ve Kar
     print(f"\nToplam Üretim Maliyeti: {toplam_maliyet:,.2f}")
     print(f"Toplam Kar: {toplam_kar:,.2f}")
 
+    # Üretici Bazında Toplam Üretim Miktarları
     print("\nÜretici Bazında Toplam Üretim Miktarları:")
     for uretici, miktar in uretici_toplam_uretim.items():
         print(f"{uretici}: {miktar:.2f}")
-    
+
 # Monte Carlo Simülasyonu
 for i in range(SIMULASYON_SAYISI):
-    # Seed Değişikliği: Her iterasyonda farklı sonuçlar elde edebilmek için seed değiştirilebilir.
     np.random.seed(12 + i)  # Her iterasyonda farklı sonuçlar elde etmek için seed'i artırıyoruz.
 
     # Stokastik Satış Miktarları (Normal Dağılım)
@@ -84,7 +87,7 @@ for i in range(SIMULASYON_SAYISI):
     # Üretici Kapasite Kısıtı
     for uretici in ureticiler:
         solver.Add(sum(x[(urun, uretici)] for urun in urunler if (urun, uretici) in x) <= uretici_kapasite_dict.get(uretici, float('inf')))
-
+    
     for uretici in ureticiler:
         solver.Add(sum(x[(urun, uretici)] for urun in urunler if (urun, uretici) in x) >= uretici_alt_kapasite_dict.get(uretici, float('inf')))
 
@@ -115,5 +118,3 @@ for i in range(SIMULASYON_SAYISI):
 # Simülasyon Sonuçlarının Ortalamasını Hesapla
 ortalama_kar = np.mean(SIMULASYON_SONUCLARI)
 print(f"\nSimülasyonların Ortalama Karı: {ortalama_kar:,.2f}")
-
-
