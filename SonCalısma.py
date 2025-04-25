@@ -5,8 +5,8 @@ from ortools.linear_solver import pywraplp
 from tqdm import tqdm
 
 # Parametreler
-SIMULASYON_SAYISI = 25000
-np.random.seed(25)
+SIMULASYON_SAYISI = 100
+np.random.seed(89)
 
 # Excel'den veri okuma
 file_path = "ORTEST.xlsx"
