@@ -4,7 +4,7 @@ import time
 from ortools.linear_solver import pywraplp
 
 # Monte Carlo Simülasyonu Parametreleri
-SIMULASYON_SAYISI = 10
+SIMULASYON_SAYISI = 12
 np.random.seed(12)
 
 # Excel dosyasından verileri okuma

@@ -3,7 +3,7 @@ import numpy as np
 from ortools.linear_solver import pywraplp
 
 # === Parametreler ===
-SIMULASYON_SAYISI = 4
+SIMULASYON_SAYISI = 15
 np.random.seed(12)
 file_path = "ORTEST.xlsx"
 
