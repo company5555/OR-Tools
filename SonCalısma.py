@@ -5,8 +5,8 @@ from ortools.linear_solver import pywraplp
 from tqdm import tqdm
 
 # Parametreler
-SIMULASYON_SAYISI = 100
-np.random.seed(89)
+SIMULASYON_SAYISI = 5000
+np.random.seed(15)
 
 # Excel'den veri okuma
 file_path = "ORTEST.xlsx"
@@ -85,6 +85,7 @@ progress_bar.close()
 objective.SetMaximization()
 
 # Modeli çöz
+status = solver.Solve()
 if solver.Solve() == pywraplp.Solver.OPTIMAL:
     print("\n=== Sonuçlar ===")
     toplam_kar = 0
@@ -104,5 +105,17 @@ if solver.Solve() == pywraplp.Solver.OPTIMAL:
     print(f"\nToplam Gider: {toplam_gider:,.2f}")
     print(f"Beklenen Ortalama Kar: {toplam_kar - toplam_gider:,.2f}")
     print(f"Çözüm süresi: {time.time() - start_time:.2f} saniye")
+    print("\n=== Üretici Bazında Toplam Üretim Miktarları ===")
+    for uretici in ureticiler:
+        toplam_uretim = sum(x[(urun, uretici)].solution_value() for urun in urunler if (urun, uretici) in x)
+        print(f"{uretici}: {toplam_uretim:.0f} adet")
+elif status == pywraplp.Solver.FEASIBLE:
+    print("Geçerli bir çözüm bulundu ama optimal değil.")
+elif status == pywraplp.Solver.INFEASIBLE:
+    print("Model çelişkili: Uygun çözüm yok (INFEASIBLE).")
+elif status == pywraplp.Solver.UNBOUNDED:
+    print("Amaç fonksiyonu sınırsız (UNBOUNDED).")
 else:
-    print("Optimizasyon çözülemedi.")
+    print("Çözüm durumu bilinmiyor veya hata oluştu.")
+
+    
