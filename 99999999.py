@@ -3,7 +3,7 @@ import numpy as np
 from ortools.linear_solver import pywraplp
 
 # Monte Carlo Simülasyonu Parametreleri
-SIMULASYON_SAYISI = 90  # Simülasyon sayısını buradan değiştirebilirsiniz.
+SIMULASYON_SAYISI = 10  # Simülasyon sayısını buradan değiştirebilirsiniz.
 SIMULASYON_SONUCLARI = []
 
 np.random.seed(12)  # Sabit bir başlangıç değeri kullanarak simülasyonu yeniden üretilebilir yapıyoruz.
