@@ -3,13 +3,13 @@ import numpy as np
 from ortools.linear_solver import pywraplp
 
 # Monte Carlo Simülasyonu Parametreleri
-SIMULASYON_SAYISI = 10  # Simülasyon sayısını buradan değiştirebilirsiniz.
+SIMULASYON_SAYISI = 2  # Simülasyon sayısını buradan değiştirebilirsiniz.
 SIMULASYON_SONUCLARI = []
 
 np.random.seed(12)  # Sabit bir başlangıç değeri kullanarak simülasyonu yeniden üretilebilir yapıyoruz.
 
 # Excel dosyasından verileri okuma
-file_path = "ORTEST.xlsx"
+file_path = "ORTEST135.xlsx"
 urun_kisit_data = pd.read_excel(file_path, sheet_name="Ürün - Kısıt")
 urun_satis_data = pd.read_excel(file_path, sheet_name="Ürün - Fiyat")
 urun_uretici_data = pd.read_excel(file_path, sheet_name="Ürün - Üretici")
@@ -29,28 +29,7 @@ urun_param_dict = {row["Ürün"]: {"ortalama": row["Ortalama"], "std": row["STD"
 uretici_kapasite_dict = dict(zip(uretici_kapasite_data['Üretici'], uretici_kapasite_data['Üst Kapasite']))
 uretici_alt_kapasite_dict = dict(zip(uretici_kapasite_data['Üretici'], uretici_kapasite_data['Alt Kapasite']))
 
-def iterasyon_sonuclarini_yazdir(iterasyon, sales_stochastic, x_values, toplam_kar, toplam_maliyet, uretici_toplam_uretim):
-    print(f"\n=== {iterasyon + 1}. İTERASYON SONUÇLARI ===")
-    
-    # Stokastik Taleplerin Yazdırılması
-    print("Stokastik Talepler (Satış Miktarları):")
-    for urun, miktar in sales_stochastic.items():
-        print(f"{urun}: {miktar:.2f}")
-    
-    # Üretim Miktarlarının Yazdırılması
-    print("\nÜretim Miktarları:")
-    for (urun, uretici), uretim_miktari in x_values.items():
-        if uretim_miktari > 0:
-            print(f"{urun} - {uretici}: {uretim_miktari:.2f}")
 
-    # Toplam Üretim Maliyeti ve Kar
-    print(f"\nToplam Üretim Maliyeti: {toplam_maliyet:,.2f}")
-    print(f"Toplam Kar: {toplam_kar:,.2f}")
-
-    # Üretici Bazında Toplam Üretim Miktarları
-    print("\nÜretici Bazında Toplam Üretim Miktarları:")
-    for uretici, miktar in uretici_toplam_uretim.items():
-        print(f"{uretici}: {miktar:.2f}")
 
 # Monte Carlo Simülasyonu
 for i in range(SIMULASYON_SAYISI):
@@ -106,8 +85,7 @@ for i in range(SIMULASYON_SAYISI):
         # Üretici Bazında Toplam Üretim Miktarları
         uretici_toplam_uretim = {uretici: sum(x_values[(urun, uretici)] for urun in urunler if (urun, uretici) in x_values) for uretici in ureticiler}
 
-        # Sonuçları Yazdır
-        iterasyon_sonuclarini_yazdir(i, sales_stochastic, x_values, toplam_kar, toplam_maliyet, uretici_toplam_uretim)
+    
         
         # Sonuçları Kaydet
         SIMULASYON_SONUCLARI.append(toplam_kar)

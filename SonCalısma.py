@@ -5,8 +5,8 @@ from ortools.linear_solver import pywraplp
 from tqdm import tqdm
 
 # Parametreler
-SIMULASYON_SAYISI = 5000
-np.random.seed(15)
+SIMULASYON_SAYISI = 1000
+np.random.seed(4)
 
 # Excel'den veri okuma
 file_path = "ORTEST.xlsx"
@@ -97,7 +97,7 @@ if solver.Solve() == pywraplp.Solver.OPTIMAL:
     print("\n=== Ürün Bazında Toplam Üretim Miktarları ===")
     for urun in urunler:
         toplam_uretim = sum(x[(urun, uretici)].solution_value() for uretici in ureticiler if (urun, uretici) in x)
-        print(f"{urun}: {toplam_uretim:.0f} adet")
+        print(f"{urun}: {toplam_uretim:.0f}")
 
 
     for (urun, uretici), var in x.items(): 

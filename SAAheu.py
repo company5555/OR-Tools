@@ -97,8 +97,8 @@ uretici_alt_kapasite_dict = dict(zip(uretici_kapasite_data['Üretici'], uretici_
 
 # SAA Parametreleri
 NUM_GROUPS = 5
-NUM_EVALUATION = 100
-SIMULASYON_SAYISI = 1000
+NUM_EVALUATION = 10
+SIMULASYON_SAYISI = 5000
 
 best_plan = None
 best_profit = -float('inf')
