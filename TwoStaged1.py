@@ -6,8 +6,6 @@ import time
 
 # === Parametreler ===
 SIMULASYON_SAYISI = 10  # Senaryo sayısı (Sample Average Approximation)
-SCENARIO_PROB = 1.0 / SIMULASYON_SAYISI  # Her senaryonun olasılığı eşit
-
 # === Excel'den veri okuma ===
 file_path = "ORTEST.xlsx"
 urun_kisit_data = pd.read_excel(file_path, sheet_name="Ürün - Kısıt")
